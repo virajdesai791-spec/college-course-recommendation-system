@@ -542,19 +542,32 @@ for col, (title, description) in zip(feature_cols, features):
 st.sidebar.markdown("## 🎯 Find Your Course")
 st.sidebar.caption("Choose your preferences and discover matching colleges.")
 
-programmes = ["All Programmes"] + sorted(df["Programme"].dropna().unique().tolist())
-disciplines = ["All Disciplines"] + sorted(df["Discipline"].dropna().unique().tolist())
+programmes = ["All Programmes"] + sorted(
+    df["Programme"].dropna().unique().tolist()
+)
+
+selected_programme = st.sidebar.selectbox(
+    "📘 Programme",
+    programmes
+)
+
+# Discipline depends on selected Programme
+# Discipline depends on selected Programme
+if selected_programme == "All Programmes":
+    discipline_df = df
+else:
+    discipline_df = df[df["Programme"] == selected_programme]
+
+disciplines = ["All Disciplines"] + sorted(
+    discipline_df["Discipline"].dropna().unique().tolist()
+)
+
 states = ["All States"] + sorted(
     df["State Name"].dropna().unique().tolist()
 )
 
 modes = ["All Modes"] + sorted(
     df["Mode"].dropna().unique().tolist()
-)
-
-selected_programme = st.sidebar.selectbox(
-    "📘 Programme",
-    programmes
 )
 
 selected_discipline = st.sidebar.selectbox(
@@ -566,7 +579,6 @@ selected_state = st.sidebar.selectbox(
     "📍 State",
     states
 )
-
 # Districts depend on selected State
 if selected_state == "All States":
     district_options = sorted(
