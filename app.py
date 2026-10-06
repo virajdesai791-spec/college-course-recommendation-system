@@ -1,6 +1,7 @@
 import streamlit as st
 import pandas as pd
 import html
+import matplotlib.pyplot as plt
 
 # =========================================================
 # PAGE SETTINGS
@@ -641,10 +642,13 @@ if selected_district != "All Districts":
 if selected_mode != "All Modes":
     results = results[results["Mode"] == selected_mode]
 
+
+
 # =========================================================
-# VECTORISED MATCH SCORE
+# FEATURE ENGINEERING - RECOMMENDATION MATCH SCORE
 # =========================================================
 
+# Create a new Match Score feature using existing course preferences.
 score = pd.Series(0.0, index=results.index)
 
 if selected_programme != "All Programmes":
@@ -1043,65 +1047,136 @@ else:
 st.markdown("## 📊 Advanced Analytics")
 
 tab1, tab2, tab3, tab4, tab5 = st.tabs([
-    "📈 Programme Analysis",
-    "🗺️ State Analysis",
-    "🏙️ District Analysis",
-    "💻 Mode Analysis",
-    "🔎 College Search"
+    "Programme Analysis",
+    "State Analysis",
+    "District Analysis",
+    "Mode Analysis",
+    "College Search"
 ])
+
+# ---------------------------------------------------------
+# PROGRAMME ANALYSIS
+# ---------------------------------------------------------
 
 with tab1:
     programme_counts = results["Programme"].value_counts().head(12)
 
     if not programme_counts.empty:
-        st.bar_chart(programme_counts)
+        fig, ax = plt.subplots(figsize=(10, 5))
+
+        programme_counts.plot(
+            kind="bar",
+            ax=ax
+        )
+
+        ax.set_title("Programme-wise Course Distribution")
+        ax.set_xlabel("Programme")
+        ax.set_ylabel("Number of Courses")
+        plt.xticks(rotation=45, ha="right")
+        plt.tight_layout()
+
+        st.pyplot(fig)
+        plt.close(fig)
+
+
+# ---------------------------------------------------------
+# STATE ANALYSIS
+# ---------------------------------------------------------
 
 with tab2:
     state_counts = results["State Name"].value_counts().head(15)
 
     if not state_counts.empty:
-        st.bar_chart(state_counts)
+        fig, ax = plt.subplots(figsize=(10, 5))
+
+        state_counts.plot(
+            kind="bar",
+            ax=ax
+        )
+
+        ax.set_title("Top States by Course Availability")
+        ax.set_xlabel("State")
+        ax.set_ylabel("Number of Courses")
+        plt.xticks(rotation=45, ha="right")
+        plt.tight_layout()
+
+        st.pyplot(fig)
+        plt.close(fig)
+
+
+# ---------------------------------------------------------
+# DISTRICT ANALYSIS
+# ---------------------------------------------------------
 
 with tab3:
     district_counts = results["District Name"].value_counts().head(15)
 
     if not district_counts.empty:
-        st.bar_chart(district_counts)
+        fig, ax = plt.subplots(figsize=(10, 5))
+
+        district_counts.plot(
+            kind="bar",
+            ax=ax
+        )
+
+        ax.set_title("Top Districts by Course Availability")
+        ax.set_xlabel("District")
+        ax.set_ylabel("Number of Courses")
+        plt.xticks(rotation=45, ha="right")
+        plt.tight_layout()
+
+        st.pyplot(fig)
+        plt.close(fig)
+
+
+# ---------------------------------------------------------
+# MODE ANALYSIS
+# ---------------------------------------------------------
 
 with tab4:
     mode_counts = results["Mode"].value_counts()
 
     if not mode_counts.empty:
-        st.bar_chart(mode_counts)
+        fig, ax = plt.subplots(figsize=(8, 5))
+
+        mode_counts.plot(
+            kind="bar",
+            ax=ax
+        )
+
+        ax.set_title("Course Availability by Mode")
+        ax.set_xlabel("Mode")
+        ax.set_ylabel("Number of Courses")
+        plt.xticks(rotation=45, ha="right")
+        plt.tight_layout()
+
+        st.pyplot(fig)
+        plt.close(fig)
+
+
+# ---------------------------------------------------------
+# COLLEGE SEARCH
+# ---------------------------------------------------------
 
 with tab5:
-    analytics_search = st.text_input(
-        "🔎 Search any college name",
-        placeholder="Type a college name...",
-        key="analytics_search"
+    search_college = st.text_input(
+        "Search College Name",
+        placeholder="Enter college name..."
     )
 
-    if analytics_search.strip():
-        analytics_results = df[
-            df["InstituteName"].str.lower().str.contains(
-                analytics_search.strip().lower(),
-                na=False,
-                regex=False
-            )
-        ].drop_duplicates(subset=["InstituteName"])
+    if search_college:
+        college_search_results = results[
+            results["InstituteName"]
+            .str.contains(search_college, case=False, na=False)
+        ]
 
-        if analytics_results.empty:
-            st.warning("No college found.")
-        else:
+        if not college_search_results.empty:
             st.dataframe(
-                analytics_results[
-                    ["InstituteName", "State Name", "District Name"]
-                ].head(100),
-                use_container_width=True,
-                hide_index=True
+                college_search_results,
+                use_container_width=True
             )
-    else:
-        st.info("Search for a college to see matching names.")
+        else:
+            st.info("No matching college found.")
 
 # =========================================================
 # DATASET QUALITY
