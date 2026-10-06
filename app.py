@@ -2,6 +2,7 @@ import streamlit as st
 import pandas as pd
 import html
 import matplotlib.pyplot as plt
+from ml_recommender import train_model
 
 # =========================================================
 # PAGE SETTINGS
@@ -642,6 +643,71 @@ if selected_district != "All Districts":
 if selected_mode != "All Modes":
     results = results[results["Mode"] == selected_mode]
 
+# =========================================================
+# MACHINE LEARNING - SIMILARITY RECOMMENDATION
+# =========================================================
+
+# Train the ML similarity model
+ml_model, ml_encoder, ml_features = train_model(df)
+
+if len(results) > 0:
+
+    # Encode the colleges that already passed the selected filters
+    filtered_encoded = ml_encoder.transform(
+        results[ml_features].astype(str)
+    )
+
+    # Create student preference data
+    # "All ..." selections are treated as no preference
+    user_data = pd.DataFrame([{
+        "Programme": (
+            selected_programme
+            if selected_programme != "All Programmes"
+            else ""
+        ),
+        "Discipline": (
+            selected_discipline
+            if selected_discipline != "All Disciplines"
+            else ""
+        ),
+        "State Name": (
+            selected_state
+            if selected_state != "All States"
+            else ""
+        ),
+        "District Name": (
+            selected_district
+            if selected_district != "All Districts"
+            else ""
+        ),
+        "Mode": (
+            selected_mode
+            if selected_mode != "All Modes"
+            else ""
+        )
+    }])
+
+    # Convert student preferences into numerical form
+    user_encoded = ml_encoder.transform(
+        user_data[ml_features].astype(str)
+    )
+
+    # Calculate similarity between student preferences
+    # and the already filtered colleges
+    from sklearn.metrics.pairwise import cosine_similarity
+
+    similarity = cosine_similarity(
+        user_encoded,
+        filtered_encoded
+    )[0]
+
+    # Convert similarity into percentage
+    results["ML Match Score"] = (
+        similarity * 100
+    ).round(1)
+
+else:
+    results["ML Match Score"] = 0.0
 
 
 # =========================================================
@@ -652,25 +718,43 @@ if selected_mode != "All Modes":
 score = pd.Series(0.0, index=results.index)
 
 if selected_programme != "All Programmes":
-    score += (results["Programme"] == selected_programme).astype(float) * 30
+    score += (
+        results["Programme"] == selected_programme
+    ).astype(float) * 30
 
 if selected_discipline != "All Disciplines":
-    score += (results["Discipline"] == selected_discipline).astype(float) * 30
+    score += (
+        results["Discipline"] == selected_discipline
+    ).astype(float) * 30
 
 if selected_state != "All States":
-    score += (results["State Name"] == selected_state).astype(float) * 20
+    score += (
+        results["State Name"] == selected_state
+    ).astype(float) * 20
 
 if selected_district != "All Districts":
-    score += (results["District Name"] == selected_district).astype(float) * 10
+    score += (
+        results["District Name"] == selected_district
+    ).astype(float) * 10
 
 if selected_mode != "All Modes":
-    score += (results["Mode"] == selected_mode).astype(float) * 10
+    score += (
+        results["Mode"] == selected_mode
+    ).astype(float) * 10
 
 # Marks influence the recommendation slightly.
 marks_bonus = min(max(marks, 0), 100) / 100 * 5
 score += marks_bonus
 
-results["Match Score"] = score.clip(upper=100).round(1)
+results["Match Score"] = (
+    score.clip(upper=100).round(1)
+)
+
+# Combine preference score and ML similarity score
+results["Final Match Score"] = (
+    results["Match Score"] * 0.5
+    + results["ML Match Score"] * 0.5
+).round(1)
 
 # Remove duplicate college-course combinations where possible for display.
 display_results = results.drop_duplicates(
@@ -679,7 +763,7 @@ display_results = results.drop_duplicates(
 ).copy()
 
 display_results = display_results.sort_values(
-    by=["Match Score", "InstituteName"],
+    by=["Final Match Score", "InstituteName"],
     ascending=[False, True]
 )
 
@@ -726,7 +810,7 @@ with metric3:
     st.metric("🗺️ States", f"{display_results['State Name'].nunique():,}")
 
 with metric4:
-    best_score = float(display_results["Match Score"].max()) if not display_results.empty else 0
+    best_score = float(display_results["Final Match Score"].max()) if not display_results.empty else 0
     st.metric("⭐ Best Match", f"{best_score:.1f}%")
 
 # =========================================================
@@ -737,14 +821,16 @@ if display_results.empty:
     st.warning("No colleges found for the selected filters. Try changing your preferences.")
 else:
     visible_columns = [
-        "InstituteName",
-        "State Name",
-        "District Name",
-        "Programme",
-        "Discipline",
-        "Mode",
-        "Match Score"
-    ]
+    "InstituteName",
+    "State Name",
+    "District Name",
+    "Programme",
+    "Discipline",
+    "Mode",
+    "Match Score",
+    "ML Match Score",
+    "Final Match Score"
+]
 
     table_results = display_results.loc[
         :,
@@ -759,7 +845,7 @@ else:
         for column in table_results.columns:
             value = college_row[column]
 
-            if column == "Match Score":
+            if column in ["Match Score", "ML Match Score", "Final Match Score"]:
                 cell = f'<td><span class="score-badge">{float(value):.1f}%</span></td>'
             else:
                 cell = f'<td>{html.escape(str(value))}</td>'
@@ -1019,7 +1105,7 @@ if len(comparison_pool) >= 2:
 
             matching_score = display_results[
                 display_results["InstituteName"] == college_name
-            ]["Match Score"]
+            ]["Final Match Score"]
 
             row_data["Match Score"] = (
                 float(matching_score.max()) if not matching_score.empty else 0
